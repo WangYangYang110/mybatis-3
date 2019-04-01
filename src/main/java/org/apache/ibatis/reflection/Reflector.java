@@ -46,25 +46,40 @@ import org.apache.ibatis.reflection.property.PropertyNamer;
  */
 public class Reflector {
 
+  //对应的class类型
   private final Class<?> type;
+  //可读属性的名称的集合，存在相应getter方法的属性
   private final String[] readablePropertyNames;
+  //可写属性的名称集合，存在相应setter方法的属性
   private final String[] writablePropertyNames;
+  //记录了属性相应的setterf方法，key是方法名，value是Invoker对象，它是对setter方法对应的Method对象的封装
   private final Map<String, Invoker> setMethods = new HashMap<>();
+  //属性相应的getter方法集合，key是属性名称，value是Invoker对象
   private final Map<String, Invoker> getMethods = new HashMap<>();
+  //记录了属性相应的setter方法的参数类型，key是属性名称，value是setter方法的参数类型
   private final Map<String, Class<?>> setTypes = new HashMap<>();
+  //get方法的参数类型，key是属性名称，value是getter方法的参数类型
   private final Map<String, Class<?>> getTypes = new HashMap<>();
+  //默认的构造方法
   private Constructor<?> defaultConstructor;
-
+  //记录所有属性名称的集合
   private Map<String, String> caseInsensitivePropertyMap = new HashMap<>();
 
   public Reflector(Class<?> clazz) {
+    //初始化type字段
     type = clazz;
+    //查找clazz的默认构造方法
     addDefaultConstructor(clazz);
+    //处理clazz中的getter方法，填充getMethods与getTypes集合
     addGetMethods(clazz);
+    //处理clazz中的setter方法，填充setMethods与setTypes集合
     addSetMethods(clazz);
+    //处理没有getter/setter方法的字段
     addFields(clazz);
+    //根据getMethods/setMethods集合，初始化可读/写属性的名称集合
     readablePropertyNames = getMethods.keySet().toArray(new String[getMethods.keySet().size()]);
     writablePropertyNames = setMethods.keySet().toArray(new String[setMethods.keySet().size()]);
+    //初始化caseInsensitivePropertyMap集合，其中记录了所有大写格式的属性名称
     for (String propName : readablePropertyNames) {
       caseInsensitivePropertyMap.put(propName.toUpperCase(Locale.ENGLISH), propName);
     }
@@ -73,9 +88,15 @@ public class Reflector {
     }
   }
 
+  /**
+   * 获取无参构造
+   * @param clazz
+   */
   private void addDefaultConstructor(Class<?> clazz) {
+    //返回此clazz声明的所有构造函数
     Constructor<?>[] consts = clazz.getDeclaredConstructors();
     for (Constructor<?> constructor : consts) {
+      // getParameterTypes 返回表示形式参数类型的Class对象数组
       if (constructor.getParameterTypes().length == 0) {
         this.defaultConstructor = constructor;
       }
@@ -83,8 +104,11 @@ public class Reflector {
   }
 
   private void addGetMethods(Class<?> cls) {
+    //key属性名称，value是相应的getter方法集合，因为子类可能覆盖父类的getter方法，所以同一属性名称可能会存在多个getter方法
     Map<String, List<Method>> conflictingGetters = new HashMap<>();
+    //获取指定类及其父类和接口中定义的方法
     Method[] methods = getClassMethods(cls);
+
     for (Method method : methods) {
       if (method.getParameterTypes().length > 0) {
         continue;
@@ -157,6 +181,12 @@ public class Reflector {
     resolveSetterConflicts(conflictingSetters);
   }
 
+  /**
+   * 填充
+   * @param conflictingMethods
+   * @param name
+   * @param method
+   */
   private void addMethodConflict(Map<String, List<Method>> conflictingMethods, String name, Method method) {
     List<Method> list = conflictingMethods.computeIfAbsent(name, k -> new ArrayList<>());
     list.add(method);
@@ -284,14 +314,17 @@ public class Reflector {
    * declared in this class and any superclass.
    * We use this method, instead of the simpler <code>Class.getMethods()</code>,
    * because we want to look for private methods as well.
-   *
+   *这个函数返回一个数组包含了这个类和父类中声明的所有方法，
+   * 使用这个函数代替简单的Class.getMethods(),因为我们也想要获取私人函数
    * @param cls The class
    * @return An array containing all methods in this class
    */
   private Method[] getClassMethods(Class<?> cls) {
+    //用于指定记录当前类中定义的全部方法的唯一签名以及对应的Method对象
     Map<String, Method> uniqueMethods = new HashMap<>();
     Class<?> currentClass = cls;
     while (currentClass != null && currentClass != Object.class) {
+      //记录接口中定义的所有方法
       addUniqueMethods(uniqueMethods, currentClass.getDeclaredMethods());
 
       // we also need to look for interface methods -
@@ -309,13 +342,21 @@ public class Reflector {
     return methods.toArray(new Method[methods.size()]);
   }
 
+  /**
+   * 为每个方法生成一个唯一签名，并记录在uniqueMethods中
+   * @param uniqueMethods
+   * @param methods
+   * 指定类中所有被声明的方法
+   */
   private void addUniqueMethods(Map<String, Method> uniqueMethods, Method[] methods) {
     for (Method currentMethod : methods) {
+      //判断当前方法是否是桥接方法
       if (!currentMethod.isBridge()) {
+        //取得当前方法的唯一标识
+        //返回值类型#方法名称：参数类型列表
+        //例如：java.lang.String#getSignature:java.lang.reflect.Method
         String signature = getSignature(currentMethod);
-        // check to see if the method is already known
-        // if it is known, then an extended class must have
-        // overridden a method
+        //判断当前方法是否已经在Methods中存在，如果存在则标识子类覆盖了该方法，不需要再向uniquerMethods中添加了
         if (!uniqueMethods.containsKey(signature)) {
           uniqueMethods.put(signature, currentMethod);
         }

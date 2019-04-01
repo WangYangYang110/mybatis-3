@@ -23,8 +23,10 @@ import org.apache.ibatis.jdbc.ScriptRunner;
 import javax.sql.DataSource;
 import java.io.IOException;
 import java.io.Reader;
+import java.lang.reflect.Method;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.Properties;
 
 public abstract class BaseDataTest {
@@ -86,5 +88,17 @@ public abstract class BaseDataTest {
     runScript(ds, JPETSTORE_DDL);
     runScript(ds, JPETSTORE_DATA);
     return ds;
+  }
+
+  public static void main(String [] args){
+    Class cls = Thread.class;
+    System.out.println("Class = " + cls.getName());
+
+    Class[] c = cls.getClasses();
+    System.out.println("Classes = " + Arrays.asList(c));
+
+    // returns an array of interfaces
+    Class[] i = cls.getInterfaces();
+    System.out.println("Interfaces = " + Arrays.asList(i));
   }
 }
